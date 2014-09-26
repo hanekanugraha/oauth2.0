@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:context="http://www.springframework.org/schema/context" xmlns:https="http://www.mulesoft.org/schema/mule/https"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.5.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+	xmlns:ss="http://www.springframework.org/schema/security"
+    xmlns:oauth2-provider="http://www.mulesoft.org/schema/mule/oauth2-provider"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+http://www.mulesoft.org/schema/mule/oauth2-provider http://www.mulesoft.org/schema/mule/oauth2-provider/current/mule-oauth2-provider.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd">
+	<apikit:config name="oauthApiConfig" raml="oauth_mr_integration.raml"
+		consoleEnabled="true" consolePath="console" doc:name="Router" />
+    <context:property-placeholder location="configuration.properties"/>
+	<oauth2-provider:config 
+        name="oauth2Provider"
+        providerName="TweetBook"
+        authorizationEndpointPath="http://172.19.14.234:8084/tweetbook/api/authorize"
+        accessTokenEndpointPath="http://172.19.14.234:8084/tweetbook/api/token"/>
+	
+	<flow name="oauth2.0-test-main-flow" doc:name="oauth2.0-test-main-flow">
+		<http:inbound-endpoint exchange-pattern="request-response"
+			host="${mrintegration.oauth.host}" port="${mrintegration.oauth.port}"
+			doc:name="HTTP" path="${mrintegration.oauth.path}" />
+		<apikit:router config-ref="oauthApiConfig" doc:name="APIkit Router" />
+	</flow>
+    <flow name="get:/request-token:oauthApiConfig" doc:name="get:/request-token:oauthApiConfig">
+        <logger message="REQUEST TOKEN FLOW: #[payload]" level="INFO" doc:name="Logger"/>
+        <custom-transformer class="com.asterx.medirecords.oauth.token.RequestToken" doc:name="Java"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="String payload : #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+	<!-- 
+    <flow name="get:/github-code/{clientId}:oauthApiConfig" doc:name="get:/github-code/{clientId}:oauthApiConfig">
+        <logger message="ClientId: #[clientId]" level="INFO" doc:name="Logger"/>
+        <https:outbound-endpoint exchange-pattern="request-response" method="GET" address="https://github.com/login/oauth/authorize?client_id=#[clientId]&amp;redirect_uri=http://172.19.14.234:8088/oauth-mr-integration/ping" doc:name="HTTPS get Code"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="Raw Response : #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+     -->
+	<flow name="get:/ping:oauthApiConfig" doc:name="get:/ping:oauthApiConfig">
+        <logger message="PING FLOW: #[payload]" level="INFO" doc:name="Logger"/>
+        <oauth2-provider:validate scopes="READ_PROFILE" config-ref="oauth2Provider"/>
+		<logger message="Message: #[payload]" level="INFO" doc:name="Logger" />
+        <logger message="access_token : #[message.inboundProperties['http.query.params']['access_token']]" level="INFO" doc:name="Logger #2"/>
+	</flow>
+</mule>
