@@ -28,30 +28,86 @@ http://www.springframework.org/schema/context http://www.springframework.org/sch
         authorizationEndpointPath="http://172.19.14.234:8084/tweetbook/api/authorize"
         accessTokenEndpointPath="http://172.19.14.234:8084/tweetbook/api/token"/>
 	
+	<oauth2-provider:config 
+        name="oauth2GithubProvider"
+        providerName="Github"
+        authorizationEndpointPath="https://github.com/login/oauth/authorize"
+        accessTokenEndpointPath="https://github.com/login/oauth/access_token"/>
+	
 	<flow name="oauth2.0-test-main-flow" doc:name="oauth2.0-test-main-flow">
 		<http:inbound-endpoint exchange-pattern="request-response"
 			host="${mrintegration.oauth.host}" port="${mrintegration.oauth.port}"
 			doc:name="HTTP" path="${mrintegration.oauth.path}" />
 		<apikit:router config-ref="oauthApiConfig" doc:name="APIkit Router" />
 	</flow>
+	<!-- local -->
     <flow name="get:/request-token:oauthApiConfig" doc:name="get:/request-token:oauthApiConfig">
         <logger message="REQUEST TOKEN FLOW: #[payload]" level="INFO" doc:name="Logger"/>
-        <custom-transformer class="com.asterx.medirecords.oauth.token.RequestToken" doc:name="Java"/>
-        <object-to-string-transformer doc:name="Object to String"/>
-        <logger message="String payload : #[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="message.inboundProperties['http.query.params']['code'] !=null">
+                <logger message="CODE: #[message.inboundProperties['http.query.params']['code']]" level="INFO" doc:name="Logger Code"/>
+                <component class="com.asterx.medirecords.oauth.token.RequestToken" doc:name="Java"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <logger message="String payload : #[payload], access_token: #[sessionVars['access_token']]" level="INFO" doc:name="Logger"/>
+                <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+                <set-payload value="{ &quot;access_token&quot;:&quot;#[sessionVars['access_token']]&quot;, &quot;scope&quot;:&quot;READ&quot;, &quot;token_type&quot;:&quot;bearer&quot;}" doc:name="Set Payload"/>
+            </when>
+            <when expression="message.inboundProperties['http.query.params']['access_token'] !=null">
+                <logger level="INFO" doc:name="Logger Access Token" message="Access Token: #[message.inboundProperties['http.query.params']['access_token']]"/>
+                <set-payload value="access_token=#[message.inboundProperties['http.query.params']['access_token']]&amp;scope=READ&amp;token_type=bearer" doc:name="Set Payload"/>
+            </when>
+            <otherwise>
+                <logger level="INFO" doc:name="Logger Default"/>
+            </otherwise>
+        </choice>
+        <logger message="Final Response: #[payload]" level="INFO" doc:name="Logger"/>
     </flow>
-	<!-- 
-    <flow name="get:/github-code/{clientId}:oauthApiConfig" doc:name="get:/github-code/{clientId}:oauthApiConfig">
-        <logger message="ClientId: #[clientId]" level="INFO" doc:name="Logger"/>
-        <https:outbound-endpoint exchange-pattern="request-response" method="GET" address="https://github.com/login/oauth/authorize?client_id=#[clientId]&amp;redirect_uri=http://172.19.14.234:8088/oauth-mr-integration/ping" doc:name="HTTPS get Code"/>
+    <flow name="get:/request-code:oauthApiConfig" doc:name="get:/request-code:oauthApiConfig">
+        <logger message="test redirect page" level="INFO" doc:name="Logger"/>
+        <http:outbound-endpoint address="http://172.19.14.234:8084/tweetbook/api/authorize?response_type=code&amp;client_id=e7aaf348-f08a-11e1-9237-96c6dd6a022f&amp;scope=READ&amp;redirect_uri=http%3A%2F%2Fmtpc701%3A8088%2Foauth-mr-integration%2Frequest-token" method="GET" exchange-pattern="request-response" followRedirects="true" contentType="text/html" doc:name="HTTP" mimeType="text/html"/>
+        <set-property propertyName="http.status" value="307" doc:name="Property"/>
         <object-to-string-transformer doc:name="Object to String"/>
-        <logger message="Raw Response : #[payload]" level="INFO" doc:name="Logger"/>
+
+        <logger message="BALIK KESINI DONG" level="INFO" doc:name="Logger"/>
     </flow>
-     -->
+    <flow name="flow-get-request-code" doc:name="flow-get-request-code">
+        <http:inbound-endpoint exchange-pattern="request-response" host="${mrintegration.oauth.host}" port="${mrintegration.oauth.port}" path="${mrintegration.oauth.path}/html-request-code" doc:name="HTTP">
+        	<set-property propertyName="http.status" value="307" doc:name="Property"/>
+        	<set-property propertyName="Location" value="http://172.19.14.234:8084/tweetbook/api/authorize?response_type=code&amp;client_id=e7aaf348-f08a-11e1-9237-96c6dd6a022f&amp;scope=READ&amp;redirect_uri=http%3A%2F%2Fmtpc701%3A8088%2Foauth-mr-integration%2Frequest-token" doc:name="Property"/>
+        </http:inbound-endpoint>
+        <logger message="MASUK KE FLOW GET REQUEST CODE" level="INFO" doc:name="Logger"/>
+        <logger message="new java.lang.String(#[payload])" level="INFO" doc:name="Logger"/>
+    </flow>
+    
 	<flow name="get:/ping:oauthApiConfig" doc:name="get:/ping:oauthApiConfig">
         <logger message="PING FLOW: #[payload]" level="INFO" doc:name="Logger"/>
-        <oauth2-provider:validate scopes="READ_PROFILE" config-ref="oauth2Provider"/>
+
+        <http:outbound-endpoint exchange-pattern="request-response" host="172.19.14.234" port="8084" path="tweetbook/api/profile?access_token=#[message.inboundProperties['http.query.params']['access_token']]" method="GET" doc:name="HTTP"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <!-- <oauth2-provider:validate scopes="READ" config-ref="oauth2Provider"/> -->
 		<logger message="Message: #[payload]" level="INFO" doc:name="Logger" />
-        <logger message="access_token : #[message.inboundProperties['http.query.params']['access_token']]" level="INFO" doc:name="Logger #2"/>
 	</flow>
+    <flow name="get:/request-token-github:oauthApiConfig" doc:name="get:/request-token-github:oauthApiConfig">
+        <logger message="REQUEST TOKEN FLOW: #[payload]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice">
+            <when expression="message.inboundProperties['http.query.params']['access_token'] !=null">
+                <logger message="access_token: #[message.inboundProperties['http.query.params']['access_token']]" level="INFO" doc:name="Logger"/>
+                <set-property propertyName="Authorization" value="token #[message.inboundProperties['http.query.params']['access_token']]" doc:name="Property"/>
+            </when>
+            <otherwise>
+                <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="https://github.com/login/oauth/access_token?client_id=${github.clientid}&amp;client_secret=${github.clientsecret}&amp;code=#[message.inboundProperties['http.query.params']['code']]" doc:name="HTTPS get Access Token"/>
+                <object-to-string-transformer doc:name="Object to String"/>
+                <logger message="Response: #[payload]" level="INFO" doc:name="Logger"/>
+                <set-property propertyName="Authorization" value="token #[message.inboundProperties['http.query.params']['access_token']]" doc:name="Property"/>
+                <set-payload value="{&quot;access_token&quot;:&quot;#[message.inboundProperties['http.query.params']['access_token']]&quot;, &quot;scope&quot;:&quot;repo,gist&quot;, &quot;token_type&quot;:&quot;bearer&quot;}" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <flow name="get:/ping-github:oauthApiConfig" doc:name="get:/ping-github:oauthApiConfig">
+        <logger message="Request: #[payload]" level="INFO" doc:name="Logger"/>
+        <!-- <oauth2-provider:validate scopes="repo,gist" config-ref="oauth2GithubProvider"/> -->
+        <https:outbound-endpoint exchange-pattern="request-response" method="GET" address="https://api.github.com/?access_token=#[message.inboundProperties['http.query.params']['access_token']]" doc:name="HTTPS" responseTimeout="90000"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="Response: #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
 </mule>

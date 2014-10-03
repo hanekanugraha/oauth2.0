@@ -17,16 +17,16 @@ public class RequestToken implements Callable {
 	@Override
 	public Object onCall(MuleEventContext context) throws Exception {
 		String code = context.getMessage().getInboundProperty("code");
-		if (code == null || code.isEmpty()) {
+		if (code != null && !code.isEmpty()) {
 			OAuthClientRequest oAuthTokenRequest = OAuthClientRequest
 					.tokenLocation(
 							"http://172.19.14.234:8084/tweetbook/api/token")
 					.setGrantType(GrantType.AUTHORIZATION_CODE)
-					.setCode(
-							(String) context.getMessage().getInboundProperty(
-									"code"))
+					.setCode(code)
 					.setClientId(label.getString("mrintegration.apikey"))
 					.setClientSecret(label.getString("mrintegration.apisecret"))
+					.setRedirectURI("http://mtpc701:8088/oauth-mr-integration/request-token")
+					.setScope("READ")
 					.buildBodyMessage();
 			OAuthClient oAuthClient = new OAuthClient(new URLConnectionClient());
 

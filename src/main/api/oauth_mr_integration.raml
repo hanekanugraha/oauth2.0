@@ -11,12 +11,6 @@ securitySchemes:
             Trying example
       type: OAuth 2.0
       describedBy:
-        headers:
-          Authorization:
-              description: |
-                 Used to send a valid OAuth 2 access token. Do not use
-                 with the "access_token" query string parameter.
-              type: string
         queryParameters:
           access_token:
             description: |
@@ -46,8 +40,43 @@ securitySchemes:
           - "UPDATE"
           - "DELETE"
         
-securedBy: [ oauth_2_0 ]
-mediaType: application/json
+  - oauth_2_0_github:
+      description: |
+        OAuth2 is a protocol that lets external apps request authorization to private
+        details in a user's GitHub account without getting their password. This is
+        preferred over Basic Authentication because tokens can be limited to specific
+        types of data, and can be revoked by users at any time.
+      type: OAuth 2.0
+      describedBy:
+        headers:
+          Authorization:
+            description: |
+              Used to send a valid OAuth 2 access token. Do not use together with
+              the "access_token" query string parameter.
+            type: string
+        queryParameters:
+          access_token:
+            description: |
+              Used to send a valid OAuth 2 access token. Do not use together with
+              the "Authorization" header
+            type: string
+        responses:
+          404:
+            description: Unauthorized
+      settings:
+        authorizationUri: https://github.com/login/oauth/authorize
+        accessTokenUri: https://github.com/login/oauth/access_token
+        authorizationGrants: [ code ]
+        scopes:
+          - "user"
+          - "user:email"
+          - "user:follow"
+          - "public_repo"
+          - "repo"
+          - "repo:status"
+          - "delete_repo"
+          - "notifications"
+          - "gist"
 
 /request-token:
   get:
@@ -71,4 +100,56 @@ mediaType: application/json
                 {
                     "message": "Success"
                 }
-    
+    queryParameters:
+      client_id:
+        description: |
+          The search terms. This can be any combination of the supported user
+        type: string
+      access_token:
+        description: |
+          The search terms. This can be any combination of the supported user
+        type: string
+
+/request-code:
+  get:
+    responses:
+      200:
+        description: Success
+        body:
+          application/json:
+            example: |
+                {
+                    "message": "Success"
+                }
+
+                
+/request-token-github:
+  get:
+    responses:
+      200:
+        description: Success
+        body:
+          application/json:
+            example: |
+                {
+                    "message": "Success"
+                }
+/ping-github:
+  get:
+    securedBy: [ oauth_2_0_github ]
+    responses:
+      200:
+        description: Success
+        body:
+          application/json:
+            example: |
+                {
+                    "message": "Success"
+                }
+    queryParameters:
+      access_token:
+        description: |
+           Used to send a valid OAuth 2 access token. Do not use together with
+           the "Authorization" header
+        type: string
+        
